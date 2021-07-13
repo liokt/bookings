@@ -3,8 +3,9 @@ package render
 import (
 	"bytes"
 	"fmt"
-	"github.com/liomazza/bookings/pkg/config"
-	"github.com/liomazza/bookings/pkg/models"
+	"github.com/justinas/nosurf"
+	config2 "github.com/liomazza/bookings/internal/config"
+	models2 "github.com/liomazza/bookings/internal/models"
 	"html/template"
 	"log"
 	"net/http"
@@ -15,19 +16,23 @@ var functions = template.FuncMap{
 
 }
 
-var app *config.AppConfig
+var app *config2.AppConfig
 
 // NewTemplates sets the config for the template package
-func NewTemplates(a *config.AppConfig){
+func NewTemplates(a *config2.AppConfig){
 	app = a
 }
 
-func AddDefaultData(td *models.TemplateData) *models.TemplateData {
+func AddDefaultData(td *models2.TemplateData, r *http.Request) *models2.TemplateData {
+	td.Flash = app.Session.PopString(r.Context(), "flash")
+	td.Error = app.Session.PopString(r.Context(), "error")
+	td.Warning = app.Session.PopString(r.Context(), "warning")
+	td.CSRFToken = nosurf.Token(r)
 	return td
 }
 
 // RenderTemplate renders templates using html templates
-func RenderTemplate(w http.ResponseWriter, tmpl string, templateData *models.TemplateData) {
+func RenderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, templateData *models2.TemplateData) {
 
 	var myTemplateCache map[string]*template.Template
 
@@ -45,7 +50,7 @@ func RenderTemplate(w http.ResponseWriter, tmpl string, templateData *models.Tem
 
 	buffer := new(bytes.Buffer)
 
-	templateData = AddDefaultData(templateData)
+	templateData = AddDefaultData(templateData, r)
 
 	//We store the value of the template in a buffer so then we can read it
 	_ = t.Execute(buffer, templateData)
@@ -69,7 +74,7 @@ func CreateTemplateCache() ( map[string]*template.Template, error) {
 	for _, page := range pages {
 		name := filepath.Base(page)
 
-		//fmt.Println("Page is currently", page)
+		fmt.Println("Page is currently", page)
 
 		ts, err := template.New(name).Funcs(functions).ParseFiles(page)
 		if err != nil {
